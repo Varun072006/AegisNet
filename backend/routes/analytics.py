@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
+from auth import verify_api_key
 from database import get_db
 from models import RequestLog
 from schemas import AnalyticsSummary
@@ -13,7 +14,10 @@ router = APIRouter(prefix="/api/v1", tags=["analytics"])
 
 
 @router.get("/analytics", response_model=AnalyticsSummary)
-async def get_analytics(db: AsyncSession = Depends(get_db)):
+async def get_analytics(
+    db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
+):
     """Return aggregated analytics from in-memory metrics and database."""
     # Use in-memory metrics for real-time data
     summary = metrics.get_summary()

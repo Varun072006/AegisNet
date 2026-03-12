@@ -2,6 +2,7 @@
 
 import json
 from fastapi import APIRouter
+from auth import verify_api_key
 from schemas import ModelsResponse, ModelInfo
 from adapters import get_adapters
 
@@ -9,7 +10,7 @@ router = APIRouter(prefix="/api/v1", tags=["models"])
 
 
 @router.get("/models", response_model=ModelsResponse)
-async def list_models():
+async def list_models(api_key: str = Depends(verify_api_key)):
     """List all registered AI providers, their models, and status."""
     adapters = get_adapters()
     providers = []

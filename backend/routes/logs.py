@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
+from auth import verify_api_key
 from database import get_db
 from models import RequestLog
 from schemas import LogsResponse, LogEntry
@@ -20,6 +21,7 @@ async def get_logs(
     status: str = Query(None),
     user_id: str = Query(None),
     db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_api_key)
 ):
     """Retrieve paginated audit logs with optional filters."""
     query = select(RequestLog)

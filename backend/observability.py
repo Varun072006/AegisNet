@@ -1,10 +1,30 @@
-"""In-memory observability metrics collector."""
-
 import logging
 from collections import defaultdict
 from typing import Dict, Any, List
 from threading import Lock
+from prometheus_client import Counter, Histogram, Summary, Gauge
 
+# Prometheus Metrics
+REQUEST_COUNT = Counter(
+    "aegisnet_requests_total", 
+    "Total requests to AegisNet", 
+    ["provider", "model", "status"]
+)
+TOKEN_COUNT = Counter(
+    "aegisnet_tokens_total", 
+    "Total tokens processed", 
+    ["provider", "model", "type"]
+)
+LATENCY = Histogram(
+    "aegisnet_request_latency_ms", 
+    "Latency of requests in milliseconds",
+    ["provider", "model"]
+)
+COST = Counter(
+    "aegisnet_cost_usd_total", 
+    "Total cost in USD",
+    ["provider", "model"]
+)
 
 class MetricsCollector:
     """Collects and aggregates runtime metrics."""
@@ -33,6 +53,15 @@ class MetricsCollector:
         latency_ms: float,
         success: bool = True,
     ):
+        status = "success" if success else "error"
+        
+        # Prometheus recording
+        REQUEST_COUNT.labels(provider=provider, model=model, status=status).inc()
+        TOKEN_COUNT.labels(provider=provider, model=model, type="input").inc(input_tokens)
+        TOKEN_COUNT.labels(provider=provider, model=model, type="output").inc(output_tokens)
+        LATENCY.labels(provider=provider, model=model).observe(latency_ms)
+        COST.labels(provider=provider, model=model).inc(cost_usd)
+
         with self._lock:
             self.total_requests += 1
             self.total_tokens += input_tokens + output_tokens

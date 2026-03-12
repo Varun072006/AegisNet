@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aegisnet-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aegisnet-db
+  template:
+    metadata:
+      labels:
+        app: aegisnet-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_PASSWORD
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "aegisnet"
+        ports:
+        - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aegisnet-db
+spec:
+  selector:
+    app: aegisnet-db
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432

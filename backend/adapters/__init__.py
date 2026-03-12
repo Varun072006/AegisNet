@@ -1,6 +1,8 @@
 """Adapter registry — maps provider names to adapter instances."""
 
 from .local_adapter import LocalAdapter
+from .openai_adapter import OpenAIAdapter
+from .gemini_adapter import GeminiAdapter
 from .base import BaseAdapter
 from typing import Dict
 
@@ -14,6 +16,8 @@ def get_adapters() -> Dict[str, BaseAdapter]:
     if not _adapters:
         _adapters = {
             "local": LocalAdapter(),
+            "openai": OpenAIAdapter(),
+            "gemini": GeminiAdapter(),
             # We can map different local instances if needed, e.g. "lmstudio"
         }
     return _adapters

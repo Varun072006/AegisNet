@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aegisnet-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aegisnet-backend
+  template:
+    metadata:
+      labels:
+        app: aegisnet-backend
+    spec:
+      containers:
+      - name: backend
+        image: aegisnet-backend:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          value: "postgresql+asyncpg://postgres:postgres@aegisnet-db:5432/aegisnet"
+        - name: REDIS_URL
+          value: "redis://aegisnet-redis:6379/0"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aegisnet-backend
+spec:
+  selector:
+    app: aegisnet-backend
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000
+  type: ClusterIP

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aegisnet-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aegisnet-redis
+  template:
+    metadata:
+      labels:
+        app: aegisnet-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aegisnet-redis
+spec:
+  selector:
+    app: aegisnet-redis
+  ports:
+  - protocol: TCP
+    port: 6379
+    targetPort: 6379

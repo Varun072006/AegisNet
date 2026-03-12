@@ -1,7 +1,8 @@
 """Local model adapter via Ollama API."""
 
 import httpx
-from typing import List, Dict, Any, Optional
+import json
+from typing import List, Dict, Any, Optional, AsyncGenerator
 from .base import BaseAdapter
 from config import settings
 
@@ -46,6 +47,40 @@ class LocalAdapter(BaseAdapter):
             "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
             "model": model_name,
         }
+
+    async def chat_stream(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        max_tokens: int = 1024,
+        temperature: float = 0.7,
+    ) -> AsyncGenerator[str, None]:
+        model_name = model or self.default_model
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": model_name,
+                    "messages": messages,
+                    "stream": True,
+                    "options": {
+                        "num_predict": max_tokens,
+                        "temperature": temperature,
+                    },
+                },
+            ) as response:
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    
+                    try:
+                        chunk = json.loads(line)
+                        if "message" in chunk:
+                            yield chunk["message"]["content"]
+                    except json.JSONDecodeError:
+                        continue
 
     async def health_check(self) -> bool:
         try:

@@ -4,8 +4,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from prometheus_client import make_asgi_app
 from database import init_db
-from routes import chat, models, logs, analytics, health
+from routes import chat, models, logs, analytics, health, benchmarks, workflows
 
 
 @asynccontextmanager
@@ -33,10 +34,16 @@ app.add_middleware(
 
 # Register routes
 app.include_router(chat.router)
+app.include_router(workflows.router)
 app.include_router(models.router)
 app.include_router(logs.router)
 app.include_router(analytics.router)
 app.include_router(health.router)
+app.include_router(benchmarks.router)
+
+# Prometheus metrics
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 
 @app.get("/")

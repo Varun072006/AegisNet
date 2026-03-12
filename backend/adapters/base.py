@@ -33,6 +33,17 @@ class BaseAdapter(ABC):
         pass
 
     @abstractmethod
+    async def chat_stream(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        max_tokens: int = 1024,
+        temperature: float = 0.7,
+    ):
+        """Send a chat request and yield unified response chunks."""
+        pass
+
+    @abstractmethod
     async def health_check(self) -> bool:
         """Check if the provider is reachable."""
         pass

@@ -8,6 +8,10 @@ from router_engine import select_model
 from adapters import get_adapter
 from observability import metrics
 from compliance import log_request
+from security_engine import security_engine
+from quality_evaluator import quality_evaluator
+from policy_engine import policy_engine
+from router_engine import select_model, _classify_task, performance_tracker
 from config import settings
 
 
@@ -33,9 +37,52 @@ async def process_chat(
     5. Return unified response.
     """
     strategy = routing_strategy or settings.default_routing_strategy
+    
+    prompt_text = messages[-1]["content"] if messages else ""
+
+    # Security Filter (Updated for v3 Elite Safety)
+    is_safe, reason, risk_score = security_engine.check_prompt(prompt_text)
+    
+    if not is_safe:
+        # High Risk: Block immediately
+        await log_request(
+            db=db,
+            user_id=user_id,
+            provider="system",
+            model="security-engine-v3",
+            routing_strategy=strategy,
+            prompt=prompt_text,
+            response="",
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=0,
+            cost_usd=0,
+            latency_ms=0,
+            status="blocked",
+            error_message=f"Risk: {risk_score} - {reason}",
+        )
+        raise ValueError(f"AegisNet v3 Security: {reason}")
+    
+    # Medium Risk: Sanitize prompt before sending
+    if risk_score >= 0.5:
+        prompt_text = security_engine.sanitize_prompt(prompt_text)
+        # Update messages with sanitized text
+        messages[-1]["content"] = prompt_text
+
     provider, model = select_model(messages, strategy, model_preference)
 
-    prompt_text = messages[-1]["content"] if messages else ""
+    # --- Enterprise Governance: Policy Engine ---
+    policy_result = policy_engine.evaluate_policies(prompt_text)
+    if policy_result["triggered"]:
+        if policy_result["action"] == "restrict_to_local":
+            provider = "local"
+            # Keep original model if it was local, otherwise fallback to default
+            if model_preference and not model_preference.startswith("local/"):
+                model = None 
+        elif policy_result["action"] == "force_high_quality":
+            strategy = "quality"
+            provider, model = select_model(messages, strategy, model_preference)
+    # --------------------------------------------
 
     providers_tried = []
     last_error = None
@@ -71,6 +118,28 @@ async def process_chat(
                 latency_ms=latency_ms,
                 success=True,
             )
+            
+            # Record performance for self-learning router
+            performance_tracker.record_performance(result["model"], latency_ms, True)
+
+            # --- AI Reliability: Quality Evaluation (Self-Healing) ---
+            task_type = _classify_task(prompt_text)
+            quality = quality_evaluator.evaluate(result["content"], task_context=task_type)
+            
+            if quality["should_retry"] and len(providers_tried) < 3:
+                # Log the quality failure and continue to next provider in failover chain
+                last_error = f"Quality low: {quality['reason']}"
+                metrics.record(
+                    provider=attempt_provider,
+                    model=result["model"],
+                    input_tokens=0,
+                    output_tokens=0,
+                    cost_usd=0,
+                    latency_ms=0,
+                    success=False,
+                )
+                continue
+            # --------------------------------------------------------
 
             await log_request(
                 db=db,
@@ -113,6 +182,7 @@ async def process_chat(
                 latency_ms=0,
                 success=False,
             )
+            performance_tracker.record_performance(model, 0, False)
             continue
 
     await log_request(
@@ -133,6 +203,37 @@ async def process_chat(
     )
 
     raise RuntimeError(f"All AI providers failed. Last error: {last_error}")
+
+
+async def process_chat_stream(
+    messages: List[Dict[str, str]],
+    model_preference: Optional[str],
+    routing_strategy: str,
+    user_id: str,
+    max_tokens: int,
+    temperature: float,
+    db: AsyncSession,
+):
+    """Streaming version of process_chat."""
+    strategy = routing_strategy or settings.default_routing_strategy
+    prompt_text = messages[-1]["content"] if messages else ""
+
+    # Security Filter
+    is_safe, reason = security_engine.check_prompt(prompt_text)
+    if not is_safe:
+        raise ValueError(f"Security Alert: {reason}")
+
+    provider, model = select_model(messages, strategy, model_preference)
+    adapter = get_adapter(provider)
+    
+    # We yield directly from the adapter for now
+    async for chunk in adapter.chat_stream(
+        messages=messages,
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    ):
+        yield chunk
 
 
 def _failover_sequence(primary: str) -> List[str]:
