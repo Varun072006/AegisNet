@@ -1,7 +1,5 @@
 # <img src="C:/Users/varun/.gemini/antigravity/brain/87a86be4-f5d9-410e-af0e-388594b44fda/aegisnet_logo_1773295135317.png" width="48" valign="middle"> AegisNet v3 — The AI Operating System (AIOS)
 
-![AegisNet Banner](C:/Users/varun/.gemini/antigravity/brain/87a86be4-f5d9-410e-af0e-388594b44fda/aegisnet_banner_1773295122906.png)
-
 AegisNet is a self-optimizing, enterprise-grade **AI Control Plane** that transforms raw model access into a production-ready **AI Operating System**. It manages orchestration, security, and cost-efficiency across local and cloud AI providers.
 
 ---
